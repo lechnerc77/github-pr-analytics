@@ -103,7 +103,7 @@ async function main() {
     });
 
 
-    const outputFormat = readlineSync.question('Choose the output format (console/json, default: console): ', {
+    const outputFormat = readlineSync.question('Choose the output format (console/json/csv, default: console): ', {
         defaultInput: 'console',
     });
 
@@ -117,6 +117,8 @@ async function main() {
         since.setDate(since.getDate() - 7);
     }
 
+    const startDate = since.toISOString().split('T')[0];
+    const endDate = new Date().toISOString().split('T')[0];
     const log = console.log;
 
     for (const { owner, repo } of repositories) {
@@ -164,34 +166,36 @@ async function main() {
 
             results.push({
                 Repository: `${owner}/${repo}`,
+                startDate: startDate,
+                endDate: endDate,
                 PRs: prDetails,
                 averageTimeToMerge: parseFloat(averageMergeTime.toFixed(2)),
-                maxTimeToMerge: parseFloat(maxMergeTime.toFixed(2)),
                 minTimeToMerge: parseFloat(minMergeTime.toFixed(2)),
-                deviationMaxFromAverage: parseFloat((maxMergeTime - averageMergeTime).toFixed(2)),
+                maxTimeToMerge: parseFloat(maxMergeTime.toFixed(2)),
                 deviationMinFromAverage: parseFloat((averageMergeTime - minMergeTime).toFixed(2)),
+                deviationMaxFromAverage: parseFloat((maxMergeTime - averageMergeTime).toFixed(2)),
                 averageLinesChanged: parseFloat(averageLinesChanged.toFixed(0)),
-                maxLinesChanged,
-                minLinesChanged,
+                maxLinesChanged: maxLinesChanged,
+                minLinesChanged: minLinesChanged,
             });
 
             if (outputFormat === 'console') {
                 log("")
-                log(chalk.bold.bgYellowBright(`Pull Requests for ${owner}/${repo}:`));
+                log(chalk.bold.bgYellowBright(`Pull Requests for ${owner}/${repo} (Time intervall from ${startDate} to ${endDate}):`));
                 log("")
                 prDetails.forEach(pr => {
                     log(`- PR #${pr.number} ${pr.title}: Time to merge: ${pr.timeToMerge} minutes, Lines changed: ${pr.linesChanged.added + pr.linesChanged.deleted} (added: ${pr.linesChanged.added}, deleted: ${pr.linesChanged.deleted})`);
                 });
                 log("")
                 log(chalk.cyan(`Average time to merge for ${owner}/${repo}: ${averageMergeTime.toFixed(2)} minutes`));
-                log(chalk.cyan(`Maximum time to merge for ${owner}/${repo}: ${maxMergeTime.toFixed(2)} minutes`));
                 log(chalk.cyan(`Minimum time to merge for ${owner}/${repo}: ${minMergeTime.toFixed(2)} minutes`));
-                log(chalk.greenBright(`Maximum deviation from average time to merge : ${(maxMergeTime - averageMergeTime).toFixed(2)} minutes`));
+                log(chalk.cyan(`Maximum time to merge for ${owner}/${repo}: ${maxMergeTime.toFixed(2)} minutes`));
                 log(chalk.greenBright(`Minimum deviation from average time to merge : ${(averageMergeTime - minMergeTime).toFixed(2)} minutes`));
+                log(chalk.greenBright(`Maximum deviation from average time to merge : ${(maxMergeTime - averageMergeTime).toFixed(2)} minutes`));
                 log("")
                 log(chalk.cyan(`Average lines changed for ${owner}/${repo}: ${averageLinesChanged.toFixed(0)}`));
-                log(chalk.cyan(`Maximum lines changed for ${owner}/${repo}: ${maxLinesChanged}`));
                 log(chalk.cyan(`Minimum lines changed for ${owner}/${repo}: ${minLinesChanged}`));
+                log(chalk.cyan(`Maximum lines changed for ${owner}/${repo}: ${maxLinesChanged}`));
             }
         } catch (error) {
             log(chalk.bgRed(`Error fetching pull requests for ${owner}/${repo}:`, error.message));
@@ -202,6 +206,39 @@ async function main() {
         const outputFileName = 'output.json';
         fs.writeFileSync(outputFileName, JSON.stringify(results, null, 2));
         console.log(`Results written to ${outputFileName}`);
+    } else if (outputFormat === 'csv') {
+        const outputFileName = 'output.csv';
+        const csvHeaders = [
+            'repository_name',
+            'starttime',
+            'endtime',
+            'number_of_prs',
+            'average_time_to_merge',
+            'min_time_to_merge',
+            'max_time_to_merge',
+            'average_lines_changed',
+            'min_lines_changed',
+            'max_lines_Changed'
+        ];
+
+        const csvRows = results.map(result => {
+            return [
+                result.Repository,
+                result.startDate,
+                result.endDate,
+                result.PRs.length,
+                result.averageTimeToMerge,
+                result.minTimeToMerge,
+                result.maxTimeToMerge,
+                result.averageLinesChanged,
+                result.minLinesChanged,
+                result.maxLinesChanged
+            ].join(',');
+        });
+
+        const csvContent = [csvHeaders.join(','), ...csvRows].join('\n');
+        fs.writeFileSync(outputFileName, csvContent);
+        log(`Results written to ${outputFileName}`);
     }
 }
 
