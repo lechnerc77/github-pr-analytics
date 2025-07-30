@@ -1,4 +1,7 @@
 import { graphql } from '@octokit/graphql';
+import chalk from 'chalk';
+import readlineSync from 'readline-sync';
+import fs from 'fs';
 
 const PAT = process.env.PAT;
 
@@ -92,26 +95,46 @@ async function main() {
         { owner: 'SAP', repo: 'terraform-provider-btp' },
     ];
 
-    const period = 'last_week'; // Change to 'last_month' if needed
+    const results = []; // Define the results array to store output data
+
+    // Interactive input for time interval
+    const period = readlineSync.question('Choose the time interval (last_week/last_month, default: last_week): ', {
+        defaultInput: 'last_week',
+    });
+
+
+    const outputFormat = readlineSync.question('Choose the output format (console/json, default: console): ', {
+        defaultInput: 'console',
+    });
 
     const since = new Date();
     if (period === 'last_week') {
         since.setDate(since.getDate() - 7);
     } else if (period === 'last_month') {
         since.setMonth(since.getMonth() - 1);
+    } else {
+        console.log('Invalid input. Defaulting to last_week.');
+        since.setDate(since.getDate() - 7);
     }
 
+    const log = console.log;
+
     for (const { owner, repo } of repositories) {
-        console.log(`Fetching pull requests for ${owner}/${repo}...`);
+        log("")
+        log(chalk.gray(`Fetching pull requests for ${owner}/${repo}...`));
         try {
             const pullRequests = await fetchAllPullRequests(owner, repo);
 
             const filteredPRs = pullRequests.filter(pr => new Date(pr.mergedAt) >= since);
 
-            console.log(`Pull Requests for ${owner}/${repo}:`);
             let totalMergeTime = 0;
             let maxMergeTime = 0;
             let minMergeTime = Number.MAX_VALUE;
+            let totalLinesChanged = 0;
+            let maxLinesChanged = 0;
+            let minLinesChanged = Number.MAX_VALUE;
+
+            const prDetails = [];
 
             for (const pr of filteredPRs) {
                 const timeToMerge = calculateTimeDifferenceInMinutes(pr.createdAt, pr.mergedAt);
@@ -121,21 +144,64 @@ async function main() {
 
                 const { additions, deletions } = await fetchPRDetails(owner, repo, pr.number);
                 const linesChanged = additions + deletions;
+                totalLinesChanged += linesChanged;
+                maxLinesChanged = Math.max(maxLinesChanged, linesChanged);
+                minLinesChanged = Math.min(minLinesChanged, linesChanged);
 
-                console.log(`- PR #${pr.number} ${pr.title}: Time to merge: ${timeToMerge.toFixed(2)} minutes, Lines changed: ${linesChanged} (added: ${additions}, deleted: ${deletions})`);
+                prDetails.push({
+                    number: pr.number,
+                    title: pr.title,
+                    timeToMerge: parseFloat(timeToMerge.toFixed(2)),
+                    linesChanged: {
+                        added: additions,
+                        deleted: deletions,
+                    },
+                });
             }
 
-            if (filteredPRs.length > 0) {
-                const averageMergeTime = totalMergeTime / filteredPRs.length;
-                console.log(`Average time to merge for ${owner}/${repo}: ${averageMergeTime.toFixed(2)} minutes`);
-                console.log(`Maximum time to merge for ${owner}/${repo}: ${maxMergeTime.toFixed(2)} minutes`);
-                console.log(`Minimum time to merge for ${owner}/${repo}: ${minMergeTime.toFixed(2)} minutes`);
-            } else {
-                console.log(`No pull requests merged in the specified period for ${owner}/${repo}.`);
+            const averageMergeTime = filteredPRs.length > 0 ? totalMergeTime / filteredPRs.length : 0;
+            const averageLinesChanged = filteredPRs.length > 0 ? totalLinesChanged / filteredPRs.length : 0;
+
+            results.push({
+                Repository: `${owner}/${repo}`,
+                PRs: prDetails,
+                averageTimeToMerge: parseFloat(averageMergeTime.toFixed(2)),
+                maxTimeToMerge: parseFloat(maxMergeTime.toFixed(2)),
+                minTimeToMerge: parseFloat(minMergeTime.toFixed(2)),
+                deviationMaxFromAverage: parseFloat((maxMergeTime - averageMergeTime).toFixed(2)),
+                deviationMinFromAverage: parseFloat((averageMergeTime - minMergeTime).toFixed(2)),
+                averageLinesChanged: parseFloat(averageLinesChanged.toFixed(0)),
+                maxLinesChanged,
+                minLinesChanged,
+            });
+
+            if (outputFormat === 'console') {
+                log("")
+                log(chalk.bold.bgYellowBright(`Pull Requests for ${owner}/${repo}:`));
+                log("")
+                prDetails.forEach(pr => {
+                    log(`- PR #${pr.number} ${pr.title}: Time to merge: ${pr.timeToMerge} minutes, Lines changed: ${pr.linesChanged.added + pr.linesChanged.deleted} (added: ${pr.linesChanged.added}, deleted: ${pr.linesChanged.deleted})`);
+                });
+                log("")
+                log(chalk.cyan(`Average time to merge for ${owner}/${repo}: ${averageMergeTime.toFixed(2)} minutes`));
+                log(chalk.cyan(`Maximum time to merge for ${owner}/${repo}: ${maxMergeTime.toFixed(2)} minutes`));
+                log(chalk.cyan(`Minimum time to merge for ${owner}/${repo}: ${minMergeTime.toFixed(2)} minutes`));
+                log(chalk.greenBright(`Maximum deviation from average time to merge : ${(maxMergeTime - averageMergeTime).toFixed(2)} minutes`));
+                log(chalk.greenBright(`Minimum deviation from average time to merge : ${(averageMergeTime - minMergeTime).toFixed(2)} minutes`));
+                log("")
+                log(chalk.cyan(`Average lines changed for ${owner}/${repo}: ${averageLinesChanged.toFixed(0)}`));
+                log(chalk.cyan(`Maximum lines changed for ${owner}/${repo}: ${maxLinesChanged}`));
+                log(chalk.cyan(`Minimum lines changed for ${owner}/${repo}: ${minLinesChanged}`));
             }
         } catch (error) {
-            console.error(`Error fetching pull requests for ${owner}/${repo}:`, error.message);
+            log(chalk.bgRed(`Error fetching pull requests for ${owner}/${repo}:`, error.message));
         }
+    }
+
+    if (outputFormat === 'json') {
+        const outputFileName = 'output.json';
+        fs.writeFileSync(outputFileName, JSON.stringify(results, null, 2));
+        console.log(`Results written to ${outputFileName}`);
     }
 }
 

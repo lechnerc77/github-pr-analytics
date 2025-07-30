@@ -1,6 +1,8 @@
 {
   "type": "module",
   "dependencies": {
-    "@octokit/graphql": "^9.0.1"
+    "@octokit/graphql": "^9.0.1",
+    "chalk": "^5.4.1",
+    "readline-sync": "^1.4.10"
   }
 }
