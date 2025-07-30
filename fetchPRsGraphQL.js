@@ -110,10 +110,14 @@ async function main() {
 
             console.log(`Pull Requests for ${owner}/${repo}:`);
             let totalMergeTime = 0;
+            let maxMergeTime = 0;
+            let minMergeTime = Number.MAX_VALUE;
 
             for (const pr of filteredPRs) {
                 const timeToMerge = calculateTimeDifferenceInMinutes(pr.createdAt, pr.mergedAt);
                 totalMergeTime += timeToMerge;
+                maxMergeTime = Math.max(maxMergeTime, timeToMerge);
+                minMergeTime = Math.min(minMergeTime, timeToMerge);
 
                 const { additions, deletions } = await fetchPRDetails(owner, repo, pr.number);
                 const linesChanged = additions + deletions;
@@ -124,6 +128,8 @@ async function main() {
             if (filteredPRs.length > 0) {
                 const averageMergeTime = totalMergeTime / filteredPRs.length;
                 console.log(`Average time to merge for ${owner}/${repo}: ${averageMergeTime.toFixed(2)} minutes`);
+                console.log(`Maximum time to merge for ${owner}/${repo}: ${maxMergeTime.toFixed(2)} minutes`);
+                console.log(`Minimum time to merge for ${owner}/${repo}: ${minMergeTime.toFixed(2)} minutes`);
             } else {
                 console.log(`No pull requests merged in the specified period for ${owner}/${repo}.`);
             }
