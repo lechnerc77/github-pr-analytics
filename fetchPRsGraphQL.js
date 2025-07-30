@@ -238,7 +238,8 @@ async function main() {
 
         const csvContent = [csvHeaders.join(','), ...csvRows].join('\n');
         fs.writeFileSync(outputFileName, csvContent);
-        log(`Results written to ${outputFileName}`);
+        log("")
+        log(chalk.gray(`Results written to ${outputFileName}`));
     }
 }
 
