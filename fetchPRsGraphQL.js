@@ -93,6 +93,10 @@ async function main() {
     const repositories = [
         { owner: 'SAP', repo: 'terraform-exporter-btp' },
         { owner: 'SAP', repo: 'terraform-provider-btp' },
+        { owner: 'SAP', repo: 'terraform-provider-scc' },
+        { owner: 'SAP', repo: 'terraform-provider-sap-cloud-identity-services' },
+        { owner: 'cloudfoundry', repo: 'terraform-provider-cloudfoundry' }
+
     ];
 
     const results = []; // Define the results array to store output data
