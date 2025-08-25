@@ -184,19 +184,45 @@ async function main() {
             });
 
             if (outputFormat === 'console') {
-                log("")
-                log(chalk.bold.bgYellowBright(`Pull Requests for ${owner}/${repo} (Time intervall from ${startDate} to ${endDate}):`));
-                log("")
+                log("");
+                log(chalk.bold.bgYellowBright(`Pull Requests for ${owner}/${repo} (Time interval from ${startDate} to ${endDate}):`));
+                log("");
+
+                // Table header
+                const header = [
+                    chalk.bold('PR #'),
+                    chalk.bold('Title'),
+                    chalk.bold('Time to Merge (min)'),
+                    chalk.bold('Lines Changed'),
+                    chalk.bold('Added'),
+                    chalk.bold('Deleted')
+                ];
+                const rows = [header];
+
+                // Table rows
                 prDetails.forEach(pr => {
-                    log(`- PR #${pr.number} ${pr.title}: Time to merge: ${pr.timeToMerge} minutes, Lines changed: ${pr.linesChanged.added + pr.linesChanged.deleted} (added: ${pr.linesChanged.added}, deleted: ${pr.linesChanged.deleted})`);
+                    rows.push([
+                        pr.number.toString().padEnd(6),
+                        pr.title.length > 40 ? pr.title.slice(0, 37) + '...' : pr.title.padEnd(40),
+                        pr.timeToMerge.toString().padEnd(18),
+                        (pr.linesChanged.added + pr.linesChanged.deleted).toString().padEnd(13),
+                        pr.linesChanged.added.toString().padEnd(6),
+                        pr.linesChanged.deleted.toString().padEnd(7)
+                    ]);
                 });
-                log("")
-                log(chalk.cyan(`Average time to merge for ${owner}/${repo}: ${averageMergeTime.toFixed(2)} minutes`));
-                log(chalk.cyan(`Minimum time to merge for ${owner}/${repo}: ${minMergeTime.toFixed(2)} minutes`));
-                log(chalk.cyan(`Maximum time to merge for ${owner}/${repo}: ${maxMergeTime.toFixed(2)} minutes`));
-                log(chalk.greenBright(`Minimum deviation from average time to merge : ${(averageMergeTime - minMergeTime).toFixed(2)} minutes`));
-                log(chalk.greenBright(`Maximum deviation from average time to merge : ${(maxMergeTime - averageMergeTime).toFixed(2)} minutes`));
-                log("")
+
+                // Print table
+                rows.forEach(row => {
+                    log(row.join(' | '));
+                });
+
+                log("");
+                log(chalk.cyan(`Average time to merge for ${owner}/${repo}: ${(averageMergeTime/60).toFixed(2)} hours`));
+                log(chalk.cyan(`Minimum time to merge for ${owner}/${repo}: ${(minMergeTime/60).toFixed(2)} hours`));
+                log(chalk.cyan(`Maximum time to merge for ${owner}/${repo}: ${(maxMergeTime/60).toFixed(2)} hours`));
+                log(chalk.greenBright(`Minimum deviation from average time to merge: ${((averageMergeTime - minMergeTime)/60).toFixed(2)} hours`));
+                log(chalk.greenBright(`Maximum deviation from average time to merge: ${((maxMergeTime - averageMergeTime)/60).toFixed(2)} hours`));
+                log("");
                 log(chalk.cyan(`Average lines changed for ${owner}/${repo}: ${averageLinesChanged.toFixed(0)}`));
                 log(chalk.cyan(`Minimum lines changed for ${owner}/${repo}: ${minLinesChanged}`));
                 log(chalk.cyan(`Maximum lines changed for ${owner}/${repo}: ${maxLinesChanged}`));
